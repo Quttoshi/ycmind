@@ -1,21 +1,31 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useState } from "react";
+import { FormEvent, KeyboardEvent, useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 
 const EXAMPLE_QUERIES = [
-  "Which W23 fintech founders previously worked at Goldman Sachs?",
-  "Find all YC DevTools companies from the S21 batch",
-  "Which Stanford founders built companies in the AI sector?",
-  "Show me all YC companies that have been acquired",
+  { icon: "💰", label: "YC fintech companies", q: "Find all YC fintech companies" },
+  { icon: "🤝", label: "Acquired companies", q: "Show me all YC companies that have been acquired" },
+  { icon: "🛠️", label: "S21 DevTools", q: "Find all YC DevTools companies from the S21 batch" },
+  { icon: "🎓", label: "Stanford founders", q: "Which founders studied at Stanford?" },
 ];
 
 interface Props {
   onSubmit: (question: string) => void;
   isLoading: boolean;
+  hero?: boolean;
 }
 
-export default function SearchBar({ onSubmit, isLoading }: Props) {
+export interface SearchBarHandle {
+  focus: () => void;
+}
+
+const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar({ onSubmit, isLoading, hero }, ref) {
   const [question, setQuestion] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => textareaRef.current?.focus(),
+  }));
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -29,44 +39,52 @@ export default function SearchBar({ onSubmit, isLoading }: Props) {
     }
   };
 
+  const handleChip = (q: string) => {
+    setQuestion(q);
+    onSubmit(q);
+  };
+
   return (
-    <div className="w-full">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <div className={`flex flex-col gap-4 w-full ${hero ? "max-w-3xl mx-auto" : ""}`}>
+      <form onSubmit={handleSubmit} className="relative group">
         <textarea
+          ref={textareaRef}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask a question about YC companies and founders..."
-          rows={3}
-          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+          placeholder="Ask about YC companies, founders, batches..."
+          rows={hero ? 3 : 2}
+          className="w-full rounded-2xl border border-white/10 bg-[#1a1a1a] px-5 py-4 pr-24 text-sm text-white/90 placeholder-white/20 resize-none focus:outline-none focus:border-white/20 focus:bg-[#1e1e1e] transition-all duration-200"
           disabled={isLoading}
         />
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-400">⌘ + Enter to submit</span>
+        <div className="absolute bottom-3.5 right-3.5 flex items-center gap-2">
           <button
             type="submit"
             disabled={isLoading || !question.trim()}
-            className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="rounded-xl bg-orange-500 px-4 py-1.5 text-sm font-semibold text-white hover:bg-orange-400 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed transition-all duration-150 shadow-lg shadow-orange-500/20"
           >
-            {isLoading ? "Thinking..." : "Ask"}
+            {isLoading ? "···" : "Ask"}
           </button>
         </div>
       </form>
 
-      <div className="mt-4">
-        <p className="text-xs text-gray-400 mb-2">Example queries</p>
-        <div className="flex flex-wrap gap-2">
-          {EXAMPLE_QUERIES.map((q) => (
+      {hero && (
+        <div className="flex flex-wrap gap-2 justify-center">
+          {EXAMPLE_QUERIES.map(({ icon, label, q }) => (
             <button
               key={q}
-              onClick={() => setQuestion(q)}
-              className="rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:border-orange-400 hover:text-orange-600 transition-colors"
+              onClick={() => handleChip(q)}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.04] px-3.5 py-1.5 text-xs text-white/40 hover:border-white/15 hover:text-white/70 hover:bg-white/[0.07] transition-all duration-150 disabled:opacity-30"
             >
-              {q.length > 50 ? q.slice(0, 50) + "…" : q}
+              <span>{icon}</span>
+              <span>{label}</span>
             </button>
           ))}
         </div>
-      </div>
+      )}
     </div>
   );
-}
+});
+
+export default SearchBar;
