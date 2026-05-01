@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const BASE_URL = "";
 
 export interface Citation {
   entity_name: string;
@@ -32,7 +32,7 @@ export interface QueryResponse {
 }
 
 export async function submitQuery(question: string, topK = 5): Promise<QueryResponse> {
-  const res = await fetch(`${BASE_URL}/query`, {
+  const res = await fetch(`${BASE_URL}/api/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, top_k: topK }),

@@ -18,18 +18,16 @@ DATA_DIR = Path(__file__).parent.parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 ALGOLIA_APP_ID = "45BWZJ1SGC"
-ALGOLIA_SEARCH_KEY = "be9a4e790ed6f837e6d4af3a4e6e57f4"  # public read-only key from YC frontend
 ALGOLIA_URL = f"https://{ALGOLIA_APP_ID}-dsn.algolia.net/1/indexes/*/queries"
-
-HEADERS = {
-    "X-Algolia-Application-Id": ALGOLIA_APP_ID,
-    "X-Algolia-API-Key": ALGOLIA_SEARCH_KEY,
-    "Content-Type": "application/json",
-}
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-def fetch_page(client: httpx.Client, page: int, hits_per_page: int = 200) -> dict:
+def fetch_page(client: httpx.Client, page: int, search_key: str, hits_per_page: int = 200) -> dict:
+    headers = {
+        "X-Algolia-Application-Id": ALGOLIA_APP_ID,
+        "X-Algolia-API-Key": search_key,
+        "Content-Type": "application/json",
+    }
     payload = {
         "requests": [
             {
@@ -38,12 +36,12 @@ def fetch_page(client: httpx.Client, page: int, hits_per_page: int = 200) -> dic
             }
         ]
     }
-    resp = client.post(ALGOLIA_URL, headers=HEADERS, json=payload, timeout=30)
+    resp = client.post(ALGOLIA_URL, headers=headers, json=payload, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
 
-def fetch_all() -> list[dict]:
+def fetch_all(search_key: str) -> list[dict]:
     hits = []
     page = 0
     total_pages = 1
@@ -51,7 +49,7 @@ def fetch_all() -> list[dict]:
     with httpx.Client() as client:
         with tqdm(desc="Scraping YC Algolia", unit="page") as pbar:
             while page < total_pages:
-                data = fetch_page(client, page)
+                data = fetch_page(client, page, search_key)
                 result = data["results"][0]
 
                 if page == 0:
@@ -62,7 +60,7 @@ def fetch_all() -> list[dict]:
                 hits.extend(result["hits"])
                 page += 1
                 pbar.update(1)
-                time.sleep(0.1)  # polite delay
+                time.sleep(0.1)
 
     return hits
 
@@ -123,13 +121,18 @@ def clean_record(hit: dict) -> dict:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--key", required=True, help="Algolia public search key from YC DevTools")
+    args = parser.parse_args()
+
     print("=== YC Algolia Scraper ===")
 
     raw_path = DATA_DIR / "raw.json"
     cleaned_path = DATA_DIR / "cleaned.json"
 
     print("Fetching companies from Algolia...")
-    raw_hits = fetch_all()
+    raw_hits = fetch_all(args.key)
 
     print(f"\nSaving {len(raw_hits)} raw records to {raw_path}")
     raw_path.write_text(json.dumps(raw_hits, indent=2))

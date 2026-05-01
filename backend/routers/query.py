@@ -14,12 +14,11 @@ async def query(request: Request, body: QueryRequest):
     start = time.monotonic()
 
     retriever = HybridRetriever(
-        driver=request.app.state.neo4j_driver,
+        neo4j_client=request.app.state.neo4j_client,
         pinecone_index=request.app.state.pinecone_index,
         openai_client=request.app.state.openai_client,
-        anthropic_client=request.app.state.anthropic_client,
     )
-    llm = LLMService(anthropic_client=request.app.state.anthropic_client)
+    llm = LLMService(openai_client=request.app.state.openai_client)
 
     graph_context, vector_matches, method = retriever.retrieve(body.question, body.top_k)
     answer, citations = llm.synthesize(body.question, graph_context, vector_matches)

@@ -1,13 +1,8 @@
-"""
-Answer synthesis using Claude Sonnet with citations.
-Optionally traces to LangSmith when LANGSMITH_API_KEY is set.
-"""
-
 import json
 import os
-import re
 
-from anthropic import Anthropic
+from openai import OpenAI
+from pydantic import BaseModel
 
 from models import Citation, GraphContext
 
@@ -29,20 +24,23 @@ Graph schema:
 - Founder nodes: name, role, linkedin_url, university, previous_company
 - Batch nodes: name, season, year
 - Sector nodes: name
-- Relationships: FOUNDED, IN_BATCH, IN_SECTOR, STUDIED_AT, PREVIOUSLY_AT, ACQUIRED_BY
+- Relationships: FOUNDED, IN_BATCH, IN_SECTOR, STUDIED_AT, PREVIOUSLY_AT, ACQUIRED_BY"""
 
-Respond with JSON in this exact format:
-{
-  "answer": "Your detailed answer here using markdown for formatting",
-  "citations": [
-    {"entity_name": "Company or Founder name", "entity_type": "Company|Founder|Batch|Sector", "relevance": "Why this entity is relevant"}
-  ]
-}"""
+
+class _CitationSchema(BaseModel):
+    entity_name: str
+    entity_type: str
+    relevance: str
+
+
+class _ResponseSchema(BaseModel):
+    answer: str
+    citations: list[_CitationSchema]
 
 
 class LLMService:
-    def __init__(self, anthropic_client: Anthropic):
-        self.client = anthropic_client
+    def __init__(self, openai_client: OpenAI):
+        self.client = openai_client
         self._setup_langsmith()
 
     def _setup_langsmith(self):
@@ -56,7 +54,7 @@ class LLMService:
         graph_summary = {
             "nodes": [
                 {"label": n.label, "properties": n.properties}
-                for n in graph_context.nodes[:30]  # cap to avoid token overflow
+                for n in graph_context.nodes[:30]
             ],
             "edges": [
                 {"source": e.source, "target": e.target, "relationship": e.relationship}
@@ -89,35 +87,36 @@ class LLMService:
         vector_matches: list[dict],
     ) -> tuple[str, list[Citation]]:
         context = self._serialize_context(graph_context, vector_matches)
-
         user_message = f"Question: {question}\n\n{context}"
 
-        resp = self.client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
-        )
-
-        raw = resp.content[0].text.strip()
-
-        # Extract JSON from response
-        json_match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not json_match:
-            return raw, []
-
         try:
-            parsed = json.loads(json_match.group())
-            answer = parsed.get("answer", raw)
-            citations_raw = parsed.get("citations", [])
+            resp = self.client.chat.completions.parse(
+                model="gpt-4o-mini",
+                max_tokens=1024,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message},
+                ],
+                response_format=_ResponseSchema,
+            )
+            parsed = resp.choices[0].message.parsed
             citations = [
                 Citation(
-                    entity_name=c.get("entity_name", ""),
-                    entity_type=c.get("entity_type", ""),
-                    relevance=c.get("relevance", ""),
+                    entity_name=c.entity_name,
+                    entity_type=c.entity_type,
+                    relevance=c.relevance,
                 )
-                for c in citations_raw
+                for c in parsed.citations
             ]
-            return answer, citations
-        except json.JSONDecodeError:
-            return raw, []
+            return parsed.answer, citations
+        except Exception:
+            # Fallback: plain completion without structured output
+            resp = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                max_tokens=1024,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message},
+                ],
+            )
+            return resp.choices[0].message.content.strip(), []
