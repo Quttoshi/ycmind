@@ -12,10 +12,10 @@ import { Network, Sparkles } from "lucide-react";
 // ─── Static suggestion data (all queries are real API calls) ─────────────────
 
 const QUICK_CHIPS = [
-  { icon: "💰", label: "Top Funded",   query: "Find the most funded YC companies" },
-  { icon: "📈", label: "Went Public",  query: "Which YC companies went public?" },
-  { icon: "🤝", label: "Acquired",     query: "Show me all YC companies that were acquired" },
-  { icon: "👥", label: "Top Founders", query: "Who are the most notable YC founders?" },
+  { icon: "✅", label: "Active",    query: "Show me active YC companies" },
+  { icon: "🤝", label: "Acquired",  query: "Show me all YC companies that were acquired" },
+  { icon: "🦓", label: "Stripe",    query: "Tell me about Stripe" },
+  { icon: "🏠", label: "Airbnb",    query: "What does Airbnb do?" },
 ];
 
 const EXAMPLE_QUERIES = [
