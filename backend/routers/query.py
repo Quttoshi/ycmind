@@ -131,7 +131,8 @@ def query_stream(request: Request, body: QueryRequest):
         logger.info("Cache hit (stream) for query: %s", body.question[:60])
 
         def cached_stream():
-            yield f"data: {json.dumps({'type': 'token', 'content': cached.answer})}\n\n"
+            for chunk in re.findall(r'\S+\s*', cached.answer):
+                yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
             done = {
                 "type": "done",
                 "retrieval_method": cached.method,
