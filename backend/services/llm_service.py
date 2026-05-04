@@ -20,6 +20,13 @@ Graph schema:
 - Founder nodes: name, role, university, previous_company
 - Relationships: FOUNDED, IN_BATCH, IN_SECTOR"""
 
+DIRECT_SYSTEM_PROMPT = """You are YcMind, an expert on Y Combinator, startups, and the startup ecosystem.
+Answer the question from your general knowledge in plain flowing prose only — no bullet points, no lists, no markdown. Keep it to 3–5 sentences."""
+
+_INTENT_PROMPT = """Does this question require looking up specific Y Combinator companies, founders, batches, or sectors from a database? Answer with a single word: yes or no.
+
+Question: {question}"""
+
 
 class _CitationSchema(BaseModel):
     entity_name: str
@@ -43,6 +50,35 @@ class LLMService:
             os.environ["LANGCHAIN_TRACING_V2"] = "true"
             os.environ["LANGCHAIN_API_KEY"] = api_key
             os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGSMITH_PROJECT", "ycmind")
+
+    def needs_retrieval(self, question: str) -> bool:
+        try:
+            resp = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                max_tokens=1,
+                messages=[{"role": "user", "content": _INTENT_PROMPT.format(question=question)}],
+                temperature=0,
+            )
+            answer = resp.choices[0].message.content.strip().lower()
+            return not answer.startswith("no")
+        except Exception as e:
+            logger.warning(f"Intent check failed, defaulting to retrieval: {e}")
+            return True
+
+    def synthesize_direct_stream(self, question: str):
+        stream = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=512,
+            messages=[
+                {"role": "system", "content": DIRECT_SYSTEM_PROMPT},
+                {"role": "user", "content": question},
+            ],
+            stream=True,
+        )
+        for chunk in stream:
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content
 
     def _serialize_context(self, graph_context: GraphContext, vector_matches: list[dict]) -> str:
         graph_summary = {

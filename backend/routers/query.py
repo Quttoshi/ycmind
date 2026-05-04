@@ -131,7 +131,6 @@ def query_stream(request: Request, body: QueryRequest):
         logger.info("Cache hit (stream) for query: %s", body.question[:60])
 
         def cached_stream():
-            # Replay cached answer in one chunk so it feels instant
             yield f"data: {json.dumps({'type': 'token', 'content': cached.answer})}\n\n"
             done = {
                 "type": "done",
@@ -149,12 +148,39 @@ def query_stream(request: Request, body: QueryRequest):
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    llm = LLMService(openai_client=request.app.state.openai_client)
+
+    if not llm.needs_retrieval(body.question):
+        logger.info("Skipping retrieval for general question: %s", body.question[:60])
+
+        def direct_stream():
+            tokens = []
+            for token in llm.synthesize_direct_stream(body.question):
+                tokens.append(token)
+                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+            full_answer = "".join(tokens)
+            _cache_set(body.question, body.top_k, _CachedResult(full_answer, [], GraphContext(nodes=[], edges=[]), "none"))
+            done = {
+                "type": "done",
+                "retrieval_method": "none",
+                "latency_ms": int((time.monotonic() - start) * 1000),
+                "nodes": [],
+                "edges": [],
+                "citations": [],
+            }
+            yield f"data: {json.dumps(done)}\n\n"
+
+        return StreamingResponse(
+            direct_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     retriever = HybridRetriever(
         neo4j_client=request.app.state.neo4j_client,
         pinecone_index=request.app.state.pinecone_index,
         openai_client=request.app.state.openai_client,
     )
-    llm = LLMService(openai_client=request.app.state.openai_client)
 
     try:
         graph_context, vector_matches, method = retriever.retrieve(body.question, body.top_k)
