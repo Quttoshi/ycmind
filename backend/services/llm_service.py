@@ -1,30 +1,24 @@
 import json
+import logging
 import os
 
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 
 from models import Citation, GraphContext
 
 SYSTEM_PROMPT = """You are an expert analyst of Y Combinator companies and founders.
 
-You will be given:
-1. A user question
-2. Graph context: entities and relationships retrieved from a Neo4j knowledge graph
-3. Vector search matches: semantically similar companies
+You will be given a user question plus graph and vector context about YC companies.
 
-Your job:
-- Answer the question using ONLY the provided context
-- If the context doesn't contain enough information, say so clearly
-- Cite every claim by referencing specific entity names from the context
-- Be concise and factual
+IMPORTANT: You MUST write in plain flowing prose only. NEVER use bullet points, numbered lists, dashes, or any markdown list syntax. Every response must be one or more paragraphs of natural sentences. Weave company names, batches, and statuses naturally into the text. Keep it to 3–5 sentences unless the question genuinely requires more. If context is insufficient, say so in one sentence.
 
 Graph schema:
-- Company nodes: name, batch, status, one_liner, description, url, founded_year
-- Founder nodes: name, role, linkedin_url, university, previous_company
-- Batch nodes: name, season, year
-- Sector nodes: name
-- Relationships: FOUNDED, IN_BATCH, IN_SECTOR, STUDIED_AT, PREVIOUSLY_AT, ACQUIRED_BY"""
+- Company nodes: name, batch, status, one_liner, url
+- Founder nodes: name, role, university, previous_company
+- Relationships: FOUNDED, IN_BATCH, IN_SECTOR"""
 
 
 class _CitationSchema(BaseModel):
@@ -87,7 +81,7 @@ class LLMService:
         vector_matches: list[dict],
     ) -> tuple[str, list[Citation]]:
         context = self._serialize_context(graph_context, vector_matches)
-        user_message = f"Question: {question}\n\n{context}"
+        user_message = f"Question: {question}\n\nAnswer in plain prose only — no bullet points, no numbered lists, no dashes. Just natural sentences.\n\n{context}"
 
         try:
             resp = self.client.chat.completions.parse(
@@ -109,8 +103,8 @@ class LLMService:
                 for c in parsed.citations
             ]
             return parsed.answer, citations
-        except Exception:
-            # Fallback: plain completion without structured output
+        except Exception as e:
+            logger.warning(f"Structured output parsing failed, falling back to plain completion: {e}")
             resp = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 max_tokens=1024,
@@ -120,3 +114,26 @@ class LLMService:
                 ],
             )
             return resp.choices[0].message.content.strip(), []
+
+    def synthesize_stream(
+        self,
+        question: str,
+        graph_context: GraphContext,
+        vector_matches: list[dict],
+    ):
+        context = self._serialize_context(graph_context, vector_matches)
+        user_message = f"Question: {question}\n\nAnswer in plain prose only — no bullet points, no numbered lists, no dashes. Just natural sentences.\n\n{context}"
+
+        stream = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=1024,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_message},
+            ],
+            stream=True,
+        )
+        for chunk in stream:
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content

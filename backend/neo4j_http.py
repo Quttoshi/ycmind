@@ -4,9 +4,12 @@ Used when Bolt (port 7687) is blocked by firewall/ISP.
 Recreates the httpx client on timeout to handle connection drops.
 """
 
+import logging
 import time
 
 import httpx
+
+logger = logging.getLogger(__name__)
 from config import settings
 
 TIMEOUT = httpx.Timeout(60.0, connect=30.0)
@@ -48,7 +51,7 @@ class Neo4jHTTPClient:
             except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError) as e:
                 last_exc = e
                 wait = 2 ** attempt
-                print(f"\n  Connection error (attempt {attempt + 1}/{retries}), retrying in {wait}s...")
+                logger.warning(f"Neo4j connection error (attempt {attempt + 1}/{retries}), retrying in {wait}s")
                 time.sleep(wait)
 
         raise last_exc
