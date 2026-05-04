@@ -43,7 +43,7 @@ def _cache_set(question: str, top_k: int, result: _CachedResult):
 
 # ── Off-topic guard ───────────────────────────────────────────────────────────
 
-_OFF_TOPIC_MSG = "I can only answer questions about Y Combinator companies and founders. Try asking about a specific company, batch, sector, or founder."
+_OFF_TOPIC_MSG = "Hey! I'm YcMind ask me anything about Y Combinator companies, founders, batches, or sectors and I'll dig through the graph to find answers."
 
 _GREETINGS = re.compile(
     r"^(hi|hello|hey|howdy|sup|what'?s up|good (morning|afternoon|evening)|thanks?|thank you|bye|goodbye)[\s!?.]*$",
