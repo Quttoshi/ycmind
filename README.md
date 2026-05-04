@@ -2,7 +2,7 @@
 
 > Ask complex questions about YC companies and founders that search engines can't answer.
 
-**Live demo:** [ycmind.vercel.app](https://ycmind.vercel.app) &nbsp;|&nbsp; **Backend:** [ycmind-api.railway.app](https://ycmind-api.railway.app)
+**Live demo:** [ycmind.vercel.app](https://ycmind.vercel.app) &nbsp;|&nbsp; **Backend:** [ycmind-api.railway.app](https://ycmind.onrender.com)
 
 ---
 
