@@ -73,6 +73,9 @@ export default function Home() {
     setResponse(null);
     setError(null);
     setLastQuery("");
+    setStreamingAnswer("");
+    setIsStreaming(false);
+    setIsLoading(false);
     setTimeout(() => searchRef.current?.focus(), 50);
   };
 

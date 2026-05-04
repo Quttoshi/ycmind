@@ -96,9 +96,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
         {/* Submit row */}
         <div className="flex items-center justify-end px-3 pb-3 pt-1">
-          <span className="flex-1 text-xs text-white/40 px-1">
-            {"Enter to send · Shift+Enter for newline"}
-          </span>
+          <span className="flex-1" />
           <button
             type="submit"
             disabled={!canSubmit}
