@@ -96,7 +96,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
         {/* Submit row */}
         <div className="flex items-center justify-end px-3 pb-3 pt-1">
-          <span className="flex-1" />
+          <span className="flex-1 text-xs text-white/20 px-1">Powered by Neo4j · Pinecone · GPT-4o-mini</span>
           <button
             type="submit"
             disabled={!canSubmit}
