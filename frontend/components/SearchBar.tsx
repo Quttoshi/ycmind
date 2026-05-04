@@ -47,10 +47,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    const isCmdEnter = (e.metaKey || e.ctrlKey) && e.key === "Enter";
-    // Compact: plain Enter submits; Hero: Cmd/Ctrl+Enter submits
-    const isPlainEnter = !hero && e.key === "Enter" && !e.shiftKey;
-    if (isCmdEnter || isPlainEnter) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       doSubmit();
     }
@@ -100,7 +97,7 @@ const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
         {/* Submit row */}
         <div className="flex items-center justify-end px-3 pb-3 pt-1">
           <span className="flex-1 text-xs text-white/40 px-1">
-            {hero ? "⌘ + Enter to send" : "Enter to send"}
+            {"Enter to send · Shift+Enter for newline"}
           </span>
           <button
             type="submit"
