@@ -1,100 +1,194 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { submitQuery, QueryResponse } from "@/lib/api";
+import { streamQuery, QueryResponse } from "@/lib/api";
 import SearchBar, { SearchBarHandle } from "@/components/SearchBar";
 import AnswerPanel from "@/components/AnswerPanel";
 import ResultsTable from "@/components/ResultsTable";
 import FollowUps from "@/components/FollowUps";
+import Sidebar from "@/components/Sidebar";
+import { Network, Sparkles } from "lucide-react";
+
+// ─── Static suggestion data (all queries are real API calls) ─────────────────
+
+const QUICK_CHIPS = [
+  { icon: "💰", label: "Top Funded",   query: "Find the most funded YC companies" },
+  { icon: "📈", label: "Went Public",  query: "Which YC companies went public?" },
+  { icon: "🤝", label: "Acquired",     query: "Show me all YC companies that were acquired" },
+  { icon: "👥", label: "Top Founders", query: "Who are the most notable YC founders?" },
+];
+
+const EXAMPLE_QUERIES = [
+  "Find all YC fintech companies",
+  "Find companies building AI tools for developers",
+  "Companies solving healthcare access in emerging markets",
+];
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const [response, setResponse] = useState<QueryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingAnswer, setStreamingAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [lastQuery, setLastQuery] = useState("");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const searchRef = useRef<SearchBarHandle>(null);
-
 
   const handleSubmit = async (question: string) => {
     setIsLoading(true);
+    setIsStreaming(false);
+    setStreamingAnswer("");
     setError(null);
     setResponse(null);
     setLastQuery(question);
-    try {
-      const result = await submitQuery(question);
-      setResponse(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
+
+    await streamQuery(question, 5, {
+      onToken: (token) => {
+        setIsLoading(false);
+        setIsStreaming(true);
+        setStreamingAnswer((prev) => prev + token);
+      },
+      onDone: (meta) => {
+        setIsStreaming(false);
+        setResponse({
+          answer: "",
+          citations: meta.citations,
+          graph_context: { nodes: meta.nodes, edges: meta.edges },
+          retrieval_method: meta.retrieval_method,
+          latency_ms: meta.latency_ms,
+        });
+        setIsLoading(false);
+      },
+      onError: (err) => {
+        setError(err);
+        setIsLoading(false);
+        setIsStreaming(false);
+      },
+    });
   };
 
-  const hasResult = response || isLoading || error;
+  const handleNewSearch = () => {
+    setResponse(null);
+    setError(null);
+    setLastQuery("");
+    setTimeout(() => searchRef.current?.focus(), 50);
+  };
+
+  const hasResult = response !== null || isLoading || isStreaming || streamingAnswer !== "" || error !== null;
 
   return (
-    <div className="min-h-screen bg-[#111111] text-white">
-      {/* Sticky header after query */}
-      {hasResult && (
-        <header className="sticky top-0 z-10 border-b border-white/5 bg-[#111111]/90 backdrop-blur-md">
-          <div className="mx-auto max-w-2xl px-6 py-3 flex items-center gap-3">
-            <button
-              onClick={() => { setResponse(null); setError(null); setLastQuery(""); }}
-              className="text-base font-semibold text-orange-400 hover:text-orange-300 transition-colors shrink-0"
-            >
-              YcMind
-            </button>
-            <span className="text-white/15">·</span>
-            <span className="text-sm text-white/30 truncate">{lastQuery}</span>
-          </div>
-        </header>
-      )}
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
+      {/* Sidebar */}
+      <Sidebar
+        currentQuery={lastQuery}
+        onNewSearch={handleNewSearch}
+        onSelectHistory={handleSubmit}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed((v) => !v)}
+      />
 
-      <main className="mx-auto max-w-2xl px-6">
-        {/* Hero */}
-        {!hasResult && (
-          <div className="flex flex-col items-center pt-40 pb-10 gap-8">
+      {/* Main — flex column so content scrolls above fixed bottom bar */}
+      <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
+        {!hasResult ? (
+          /* ── HERO ─────────────────────────────────────────────────────────── */
+          <div className="flex-1 flex flex-col items-center justify-center px-6 gap-8">
             <div className="flex flex-col items-center gap-2">
-              <h1 className="text-5xl font-semibold tracking-tight bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
+              <Sparkles size={28} className="text-orange-400 mb-1" />
+              <h1 className="text-5xl font-semibold tracking-tight" style={{ color: "var(--text)" }}>
                 YcMind
               </h1>
-              <p className="text-sm text-white/30">GraphRAG over 4,000+ YC companies</p>
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                GraphRAG over 4,000+ YC companies
+              </p>
             </div>
+
             <SearchBar ref={searchRef} onSubmit={handleSubmit} isLoading={isLoading} hero />
-          </div>
-        )}
 
-        {/* Compact search */}
-        {hasResult && (
-          <div className="py-5">
-            <SearchBar ref={searchRef} onSubmit={handleSubmit} isLoading={isLoading} />
+            <div className="w-full max-w-[680px] flex flex-col gap-4">
+              <div className="flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
+                <Network size={14} />
+                <span className="text-sm">Try asking</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_CHIPS.map(({ icon, label, query }) => (
+                  <button
+                    key={label}
+                    onClick={() => handleSubmit(query)}
+                    disabled={isLoading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full border text-sm transition-all duration-150 disabled:opacity-40 hover:opacity-80"
+                    style={{ background: "var(--bg-chip)", borderColor: "var(--border)", color: "var(--text-sub)" }}
+                  >
+                    <span>{icon}</span>
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-col">
+                {EXAMPLE_QUERIES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => handleSubmit(s)}
+                    disabled={isLoading}
+                    className="flex items-center gap-3 py-2.5 text-sm text-left border-b transition-colors disabled:opacity-40 group"
+                    style={{ color: "var(--text-muted)", borderColor: "var(--border)" }}
+                  >
+                    <span className="text-xs shrink-0 group-hover:text-orange-400 transition-colors" style={{ color: "var(--text-muted)" }}>→</span>
+                    <span className="group-hover:text-[var(--text-sub)] transition-colors">{s}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        )}
+        ) : (
+          /* ── RESULTS ─────────────────────────────────────────────────────── */
+          <>
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-[720px] mx-auto w-full px-6 pt-8 pb-6">
+                {lastQuery && (
+                  <h2 className="text-xl font-semibold mb-5 leading-snug" style={{ color: "var(--text)" }}>
+                    {lastQuery}
+                  </h2>
+                )}
 
-        {/* Loading */}
-        {isLoading && (
-          <div className="flex items-center gap-2 pb-6 text-sm text-white/30">
-            <span className="h-1 w-1 rounded-full bg-orange-400 animate-ping" />
-            <span className="h-1 w-1 rounded-full bg-orange-400 animate-ping [animation-delay:200ms]" />
-            <span className="h-1 w-1 rounded-full bg-orange-400 animate-ping [animation-delay:400ms]" />
-            <span className="ml-2">Traversing knowledge graph...</span>
-          </div>
-        )}
+                {isLoading && (
+                  <div className="flex items-center gap-3 py-4 text-sm" style={{ color: "var(--text-muted)" }}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-ping" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-ping [animation-delay:150ms]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-ping [animation-delay:300ms]" />
+                    <span className="ml-1">Traversing knowledge graph…</span>
+                  </div>
+                )}
 
-        {/* Error */}
-        {error && (
-          <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm text-red-400">
-            {error}
-          </div>
-        )}
+                {error && (
+                  <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm text-red-400">
+                    {error}
+                  </div>
+                )}
 
-        {/* Results */}
-        {response && (
-          <div className="flex flex-col gap-3 pb-16">
-            <AnswerPanel response={response} />
-            <ResultsTable nodes={response.graph_context.nodes} />
-            <FollowUps query={lastQuery} onSelect={handleSubmit} />
-          </div>
+                {(isStreaming || (streamingAnswer && !response)) && (
+                  <AnswerPanel streamingAnswer={streamingAnswer} isStreaming={isStreaming} />
+                )}
+
+                {response && (
+                  <div className="flex flex-col gap-3">
+                    <AnswerPanel response={response} streamingAnswer={streamingAnswer} isStreaming={false} />
+                    <ResultsTable nodes={response.graph_context.nodes} />
+                    <FollowUps query={lastQuery} onSelect={handleSubmit} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Fixed bottom search bar */}
+            <div className="shrink-0 px-6 py-4" style={{ background: "var(--bg)" }}>
+              <div className="max-w-[720px] mx-auto">
+                <SearchBar ref={searchRef} onSubmit={handleSubmit} isLoading={isLoading} />
+              </div>
+            </div>
+          </>
         )}
       </main>
     </div>

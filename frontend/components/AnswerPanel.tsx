@@ -17,34 +17,41 @@ const ENTITY_COLORS: Record<string, string> = {
 };
 
 interface Props {
-  response: QueryResponse;
+  response?: QueryResponse;
+  streamingAnswer?: string;
+  isStreaming?: boolean;
 }
 
-export default function AnswerPanel({ response }: Props) {
-  return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.03] overflow-hidden">
-      {/* Meta */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b border-white/5">
-        <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${METHOD_COLORS[response.retrieval_method] || "text-white/40 bg-white/5 border-white/10"}`}>
-          {response.retrieval_method}
-        </span>
-        <span className="text-xs text-white/25">{response.latency_ms}ms</span>
-        <span className="text-white/10">·</span>
-        <span className="text-xs text-white/25">
-          {response.graph_context.nodes.length} nodes · {response.graph_context.edges.length} edges
-        </span>
-      </div>
+export default function AnswerPanel({ response, streamingAnswer = "", isStreaming = false }: Props) {
+  const displayText = response ? streamingAnswer || response.answer : streamingAnswer;
 
-      {/* Answer */}
-      <div className="px-6 py-5">
-        <div className="prose prose-sm prose-invert max-w-none text-white/80 prose-headings:text-white prose-a:text-orange-400 prose-strong:text-white prose-li:text-white/80">
-          <ReactMarkdown>{response.answer}</ReactMarkdown>
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Meta — only show when retrieval is complete */}
+      {response && (
+        <div className="flex items-center gap-3">
+          <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${METHOD_COLORS[response.retrieval_method] || "text-white/40 bg-white/5 border-white/10"}`}>
+            {response.retrieval_method}
+          </span>
+          <span className="text-xs text-white/25">{response.latency_ms}ms</span>
+          <span className="text-white/10">·</span>
+          <span className="text-xs text-white/25">
+            {response.graph_context.nodes.length} nodes · {response.graph_context.edges.length} edges
+          </span>
         </div>
+      )}
+
+      {/* Answer text */}
+      <div className="prose prose-sm prose-invert max-w-none text-white/80 prose-headings:text-white prose-a:text-orange-400 prose-strong:text-white prose-p:leading-relaxed">
+        <ReactMarkdown>{displayText}</ReactMarkdown>
+        {isStreaming && (
+          <span className="inline-block w-0.5 h-4 bg-orange-400 ml-0.5 align-middle animate-pulse" />
+        )}
       </div>
 
       {/* Citations */}
-      {response.citations.length > 0 && (
-        <div className="border-t border-white/5 px-6 py-4">
+      {response && response.citations.length > 0 && (
+        <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">
             Sources
           </p>

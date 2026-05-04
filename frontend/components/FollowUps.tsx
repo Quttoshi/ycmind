@@ -7,7 +7,6 @@ interface Props {
 
 function generateFollowUps(query: string): string[] {
   const q = query.toLowerCase();
-
   if (q.includes("fintech") || q.includes("finance")) {
     return [
       "Which fintech YC companies went public?",
@@ -29,13 +28,6 @@ function generateFollowUps(query: string): string[] {
       "Show me YC companies with solo founders",
     ];
   }
-  if (q.includes("devtools") || q.includes("developer") || q.includes("saas")) {
-    return [
-      "Find YC AI companies from S23",
-      "Show me YC infrastructure companies",
-      "Which DevTools companies were acquired?",
-    ];
-  }
   return [
     "Find all YC fintech companies",
     "Show me YC companies that went public",
@@ -47,18 +39,18 @@ export default function FollowUps({ query, onSelect }: Props) {
   const suggestions = generateFollowUps(query);
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-6 py-4">
+    <div className="pt-2">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">
         Follow-up
       </p>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col">
         {suggestions.map((s) => (
           <button
             key={s}
             onClick={() => onSelect(s)}
-            className="flex items-center gap-2 text-left text-sm text-white/40 hover:text-white/80 py-1.5 transition-colors group"
+            className="flex items-center gap-2 text-left text-sm text-white/40 hover:text-white/80 py-2 border-b border-white/5 last:border-0 transition-colors group"
           >
-            <span className="text-white/15 group-hover:text-orange-500 transition-colors">→</span>
+            <span className="text-white/15 group-hover:text-orange-500 transition-colors shrink-0">→</span>
             {s}
           </button>
         ))}
